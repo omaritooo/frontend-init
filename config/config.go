@@ -1,1 +1,26 @@
 package config
+
+type ProjectConfig struct {
+	Mode           string   // "new" | "existing"
+	Preset         string   // preset name or "custom"
+	PackageManager string   // npm | pnpm | yarn | bun
+	Framework      string   // react | vue | svelte | angular | astro
+	Variant        string   // vite | nextjs | nuxt | sveltekit | analog | static | ssr
+	TypeScript     bool
+	Linting        string   // eslint-prettier | biome | oxlint | none
+	UILibrary      string
+	Testing        []string
+	Tooling        []string
+}
+
+func New() *ProjectConfig {
+	return &ProjectConfig{
+		PackageManager: "npm",
+		TypeScript:     true,
+		Preset:         "custom",
+	}
+}
+
+func (c *ProjectConfig) IsNewProject() bool {
+	return c.Mode == "new"
+}
