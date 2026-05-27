@@ -1,5 +1,10 @@
 package executor
 
+import (
+	"os"
+	"path/filepath"
+)
+
 type PatchMode int
 
 const (
@@ -360,3 +365,17 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:5173' },
 })
 `
+
+// WriteConfigFiles writes all config files relative to projectDir.
+func WriteConfigFiles(projectDir string, files []ConfigFile) error {
+	for _, f := range files {
+		fullPath := filepath.Join(projectDir, f.Path)
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(fullPath, []byte(f.Content), 0644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
