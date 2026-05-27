@@ -36,3 +36,59 @@ func TestModel_DoesNotGoBeforeFirst(t *testing.T) {
 	wm := newM.(wizard.Model)
 	assert.Equal(t, 0, wm.Cursor())
 }
+
+// TestModel_RebuildAfterFramework verifies that after completing the framework
+// step the step list is rebuilt: cursor lands on a "variant" step and the view
+// contains the react-specific choices (cursor starts at 0 → "react" is chosen).
+func TestModel_RebuildAfterFramework(t *testing.T) {
+	cfg := config.New()
+	m := wizard.New(cfg)
+
+	// Steps 1-4 are selects (mode, preset, package manager, framework).
+	// Each Enter confirms item 0 and advances the cursor.
+	var tm tea.Model = m
+	for i := 0; i < 4; i++ {
+		var cmd tea.Cmd
+		tm, cmd = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		_ = cmd
+	}
+
+	wm := tm.(wizard.Model)
+
+	// After 4 enters the cursor should be at index 4 (the new "variant" step).
+	assert.Equal(t, 4, wm.Cursor())
+
+	// The current step should be the variant step injected by rebuildAfterFramework.
+	view := wm.View()
+	assert.Contains(t, view, "vite", "expected react variant choices to be visible")
+
+	// Config.Framework must have been set to "react" (index 0 of the framework choices).
+	assert.Equal(t, "react", wm.Config().Framework)
+}
+
+// TestModel_AppliesMultiSelectValue verifies that completing a multiselect step
+// writes the result (an empty []string when nothing is toggled) into the config.
+func TestModel_AppliesMultiSelectValue(t *testing.T) {
+	cfg := config.New()
+	m := wizard.New(cfg)
+
+	// Navigate through steps 1-8 (mode, preset, package manager, framework,
+	// variant, typescript, linting, ui library) – all selects.
+	var tm tea.Model = m
+	for i := 0; i < 8; i++ {
+		var cmd tea.Cmd
+		tm, cmd = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		_ = cmd
+	}
+
+	// Now on step 9: the "testing" multiselect.
+	// Press Enter without toggling anything → Value() returns []string{}.
+	var cmd tea.Cmd
+	tm, cmd = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = cmd
+
+	wm := tm.(wizard.Model)
+
+	// Testing field must be populated (empty slice, not nil).
+	assert.Equal(t, []string{}, wm.Config().Testing)
+}

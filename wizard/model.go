@@ -6,6 +6,10 @@ import (
 	"github.com/omaritooo/frontend-init/wizard/steps"
 )
 
+// stepLabelFramework is the label of the framework select step.
+// Using a constant prevents a silent breakage if the label is ever renamed.
+const stepLabelFramework = "framework"
+
 // Model is the root Bubbletea model for the wizard.
 type Model struct {
 	stepList []steps.Step
@@ -49,7 +53,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyStepValue(newStep)
 		if m.cursor < len(m.stepList)-1 {
 			m.cursor++
-			if newStep.Label() == "framework" {
+			if newStep.Label() == stepLabelFramework {
 				m.stepList = rebuildAfterFramework(m.stepList, m.cursor, m.cfg)
 			}
 		} else {
@@ -70,7 +74,9 @@ func (m Model) Cursor() int { return m.cursor }
 func (m Model) Config() *config.ProjectConfig { return m.cfg }
 
 // applyStepValue writes the completed step's result into ProjectConfig.
-func (m *Model) applyStepValue(s steps.Step) {
+// It intentionally uses a value receiver: cfg is already a pointer, so mutations
+// through m.cfg reach the underlying struct without needing a pointer receiver here.
+func (m Model) applyStepValue(s steps.Step) {
 	val := s.Value()
 	switch s.Label() {
 	case "mode":
@@ -85,7 +91,7 @@ func (m *Model) applyStepValue(s steps.Step) {
 		m.cfg.Preset = name
 	case "package manager":
 		m.cfg.PackageManager = val.(string)
-	case "framework":
+	case stepLabelFramework:
 		m.cfg.Framework = val.(string)
 	case "variant":
 		m.cfg.Variant = val.(string)
@@ -109,21 +115,7 @@ func rebuildAfterFramework(current []steps.Step, from int, cfg *config.ProjectCo
 	head := make([]steps.Step, from)
 	copy(head, current)
 
-	tail := []steps.Step{}
-	// variant step for the chosen framework
-	switch cfg.Framework {
-	case "react":
-		tail = append(tail, steps.NewSelectStep("variant", []string{"vite", "nextjs"}))
-	case "vue":
-		tail = append(tail, steps.NewSelectStep("variant", []string{"vite", "nuxt"}))
-	case "svelte":
-		tail = append(tail, steps.NewSelectStep("variant", []string{"vite", "sveltekit"}))
-	case "angular":
-		tail = append(tail, steps.NewSelectStep("variant", []string{"angular-cli", "analog"}))
-	case "astro":
-		tail = append(tail, steps.NewSelectStep("variant", []string{"static", "ssr"}))
-	}
-
+	tail := variantSteps(cfg)
 	tail = append(tail,
 		steps.NewSelectStep("typescript", []string{"yes", "no"}),
 		steps.NewSelectStep("linting", []string{"eslint-prettier", "biome", "oxlint", "none"}),
