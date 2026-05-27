@@ -3,6 +3,7 @@ package wizard
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/omaritooo/frontend-init/config"
+	"github.com/omaritooo/frontend-init/executor"
 	"github.com/omaritooo/frontend-init/wizard/steps"
 )
 
@@ -125,4 +126,58 @@ func rebuildAfterFramework(current []steps.Step, from int, cfg *config.ProjectCo
 		steps.NewConfirmStep(cfg),
 	)
 	return append(head, tail...)
+}
+
+// ExecuteModel is the Bubbletea model for the execution progress screen.
+type ExecuteModel struct {
+	step  steps.Step
+	tasks []executor.Task
+	index int
+}
+
+// NewExecuteModel creates an ExecuteModel from an ExecuteStep and the executor task list.
+func NewExecuteModel(step steps.Step, exTasks []executor.Task) ExecuteModel {
+	return ExecuteModel{step: step, tasks: exTasks}
+}
+
+func (e ExecuteModel) Init() tea.Cmd {
+	if len(e.tasks) == 0 {
+		return tea.Quit
+	}
+	return runNextTask(e.tasks, 0)
+}
+
+func (e ExecuteModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case steps.TaskProgressMsg:
+		newStep, _ := e.step.Update(msg)
+		e.step = newStep
+		if msg.State == steps.TaskDone || msg.State == steps.TaskFailed {
+			if e.index+1 < len(e.tasks) {
+				e.index++
+				return e, runNextTask(e.tasks, e.index)
+			}
+		}
+		if e.step.IsDone() {
+			return e, tea.Quit
+		}
+	case tea.KeyMsg:
+		if msg.Type == tea.KeyCtrlC {
+			return e, tea.Quit
+		}
+	}
+	return e, nil
+}
+
+func (e ExecuteModel) View() string { return e.step.View() }
+
+func runNextTask(tasks []executor.Task, idx int) tea.Cmd {
+	return func() tea.Msg {
+		err := tasks[idx].Run()
+		state := steps.TaskDone
+		if err != nil {
+			state = steps.TaskFailed
+		}
+		return steps.TaskProgressMsg{Index: idx, State: state, Err: err}
+	}
 }
