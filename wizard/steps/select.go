@@ -60,6 +60,11 @@ func (s *SelectStep) View() string {
 	return out
 }
 
-func (s *SelectStep) IsDone() bool  { return s.done }
-func (s *SelectStep) Value() any    { return s.choices[s.cursor] }
+func (s *SelectStep) IsDone() bool { return s.done }
+func (s *SelectStep) Value() any {
+	if len(s.choices) == 0 {
+		return ""
+	}
+	return s.choices[s.cursor]
+}
 func (s *SelectStep) Label() string { return s.title }
