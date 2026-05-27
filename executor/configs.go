@@ -52,7 +52,7 @@ func buildCatalog(framework string) map[string]ToolSetup {
 				{Path: "tailwind.config.ts", Content: tailwindConfig},
 			},
 			FilePatches: []FilePatch{
-				{Path: cssEntry, Insert: `@import "tailwindcss";`, Mode: PatchInsertAfter, Find: ""},
+				{Path: cssEntry, Insert: `@import "tailwindcss";`, Mode: PatchAppend},
 			},
 			Scripts: map[string]string{},
 		},
@@ -139,18 +139,33 @@ func buildCatalog(framework string) map[string]ToolSetup {
 			PostInstallCmds: []string{"npx storybook@latest init"},
 			Scripts:         map[string]string{"storybook": "storybook dev -p 6006", "build-storybook": "storybook build"},
 		},
-		"tanstack-query": {
-			Name:     "TanStack Query",
-			Packages: []string{"@tanstack/react-query"},
-			FilePatches: []FilePatch{
-				{
-					Path:   mainEntry,
-					Find:   "ReactDOM.createRoot",
-					Insert: "import { QueryClient, QueryClientProvider } from '@tanstack/react-query'\nconst queryClient = new QueryClient()\n",
-					Mode:   PatchInsertAfter,
-				},
-			},
-		},
+		"tanstack-query": func() ToolSetup {
+			switch framework {
+			case "vue", "nuxt":
+				return ToolSetup{
+					Name:     "TanStack Query",
+					Packages: []string{"@tanstack/vue-query"},
+				}
+			case "svelte", "sveltekit":
+				return ToolSetup{
+					Name:     "TanStack Query",
+					Packages: []string{"@tanstack/svelte-query"},
+				}
+			default: // react, nextjs, astro
+				return ToolSetup{
+					Name:     "TanStack Query",
+					Packages: []string{"@tanstack/react-query"},
+					FilePatches: []FilePatch{
+						{
+							Path:   mainEntry,
+							Find:   "ReactDOM.createRoot",
+							Insert: "import { QueryClient, QueryClientProvider } from '@tanstack/react-query'\nconst queryClient = new QueryClient()\n",
+							Mode:   PatchInsertAfter,
+						},
+					},
+				}
+			}
+		}(),
 		"tanstack-router": {
 			Name:        "TanStack Router",
 			Packages:    []string{"@tanstack/react-router"},
@@ -282,23 +297,12 @@ func buildCatalog(framework string) map[string]ToolSetup {
 			DevPackages:     []string{},
 			PostInstallCmds: []string{"npx shadcn-svelte@latest init"},
 		},
-		"tailwind-only": {
-			Name:        "Tailwind CSS (only)",
-			DevPackages: []string{"tailwindcss", "@tailwindcss/vite"},
-			ConfigFiles: []ConfigFile{
-				{Path: "tailwind.config.ts", Content: tailwindConfig},
-			},
-			FilePatches: []FilePatch{
-				{Path: cssEntry, Insert: `@import "tailwindcss";`, Mode: PatchInsertAfter, Find: ""},
-			},
-			Scripts: map[string]string{},
-		},
 	}
 }
 
 func mainEntryFile(framework string) string {
 	switch framework {
-	case "vue", "nuxt", "angular":
+	case "vue", "angular":
 		return "src/main.ts"
 	default:
 		return "src/main.tsx"
