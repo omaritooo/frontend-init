@@ -45,26 +45,80 @@ func GetToolSetup(tool, framework string) *ToolSetup {
 	return nil
 }
 
+func viteFrameworkPlugin(framework string) string {
+	switch framework {
+	case "vue", "nuxt":
+		return "vue()"
+	case "svelte", "sveltekit":
+		return "sveltekit()"
+	default: // react, nextjs, astro
+		return "react()"
+	}
+}
+
 func buildCatalog(framework string) map[string]ToolSetup {
 	mainEntry := mainEntryFile(framework)
 	cssEntry := cssEntryFile(framework)
+	vitePlugin := viteFrameworkPlugin(framework)
 
 	return map[string]ToolSetup{
 		"tailwind": {
 			Name:        "Tailwind CSS",
 			DevPackages: []string{"tailwindcss", "@tailwindcss/vite"},
-			ConfigFiles: []ConfigFile{
-				{Path: "tailwind.config.ts", Content: tailwindConfig},
-			},
 			FilePatches: []FilePatch{
+				// Add CSS import
 				{Path: cssEntry, Insert: `@import "tailwindcss";`, Mode: PatchAppend},
+				// Add plugin import after the last 'from vite' or framework import
+				{
+					Path:   "vite.config.ts",
+					Find:   "from 'vite'",
+					Insert: "\nimport tailwindcss from '@tailwindcss/vite'",
+					Mode:   PatchInsertAfter,
+				},
+				// Wire plugin into the plugins array
+				{
+					Path:   "vite.config.ts",
+					Find:   "plugins: [" + vitePlugin + "]",
+					Insert: "plugins: [" + vitePlugin + ", tailwindcss()]",
+					Mode:   PatchReplace,
+				},
 			},
-			Scripts: map[string]string{},
 		},
 		"shadcn": {
-			Name:            "shadcn/ui",
-			DevPackages:     []string{"shadcn"},
-			PostInstallCmds: []string{"npx shadcn init"},
+			Name:        "shadcn/ui",
+			DevPackages: []string{"@types/node"},
+			FilePatches: []FilePatch{
+				// Add path import to vite.config.ts
+				{
+					Path:   "vite.config.ts",
+					Find:   "import { defineConfig } from 'vite'",
+					Insert: "\nimport path from 'path'",
+					Mode:   PatchInsertAfter,
+				},
+				// Add resolve.alias block before closing })
+				{
+					Path:   "vite.config.ts",
+					Find:   "\n})",
+					Insert: "\n  resolve: {\n    alias: { '@': path.resolve(__dirname, './src') },\n  },\n})",
+					Mode:   PatchReplace,
+				},
+				// Add paths to tsconfig.app.json
+				{
+					Path:   "tsconfig.app.json",
+					Find:   "\"compilerOptions\": {",
+					Insert: "\n    \"baseUrl\": \".\",\n    \"paths\": { \"@/*\": [\"./src/*\"] },",
+					Mode:   PatchInsertAfter,
+				},
+				// Add paths to tsconfig.json
+				{
+					Path:   "tsconfig.json",
+					Find:   "\"compilerOptions\": {",
+					Insert: "\n    \"baseUrl\": \".\",\n    \"paths\": { \"@/*\": [\"./src/*\"] },",
+					Mode:   PatchInsertAfter,
+				},
+			},
+			// shadcn@latest init handles tailwind setup, path aliases, and components.json
+			PostInstallCmds: []string{"npx shadcn@latest init --yes"},
 		},
 		"eslint-prettier": {
 			Name:        "ESLint + Prettier",
@@ -317,14 +371,6 @@ func mainEntryFile(framework string) string {
 func cssEntryFile(_ string) string {
 	return "src/index.css"
 }
-
-const tailwindConfig = `import type { Config } from 'tailwindcss'
-export default {
-  content: ['./index.html', './src/**/*.{ts,tsx,vue,svelte}'],
-  theme: { extend: {} },
-  plugins: [],
-} satisfies Config
-`
 
 const eslintConfig = `import js from '@eslint/js'
 export default [

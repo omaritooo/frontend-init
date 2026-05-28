@@ -7,18 +7,15 @@ import (
 	"github.com/omaritooo/frontend-init/wizard/steps"
 )
 
-// stepLabelFramework is the label of the framework select step.
-// Using a constant prevents a silent breakage if the label is ever renamed.
 const stepLabelFramework = "framework"
+const stepLabelMode = "mode"
 
-// Model is the root Bubbletea model for the wizard.
 type Model struct {
 	stepList []steps.Step
 	cursor   int
 	cfg      *config.ProjectConfig
 }
 
-// New creates a new wizard Model with the full initial step list.
 func New(cfg *config.ProjectConfig) Model {
 	return Model{
 		stepList: BuildInitialSteps(cfg),
@@ -44,7 +41,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	current := m.stepList[m.cursor]
 	newStep, cmd := current.Update(msg)
 
-	// copy the step list to avoid mutating the backing array
 	newList := make([]steps.Step, len(m.stepList))
 	copy(newList, m.stepList)
 	newList[m.cursor] = newStep
@@ -54,7 +50,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyStepValue(newStep)
 		if m.cursor < len(m.stepList)-1 {
 			m.cursor++
-			if newStep.Label() == stepLabelFramework {
+			switch newStep.Label() {
+			case stepLabelMode:
+				if m.cfg.Mode == "new" {
+					m.stepList = insertStepAt(m.stepList, m.cursor, steps.NewInputStep("project name", "my-app"))
+				}
+			case stepLabelFramework:
 				m.stepList = rebuildAfterFramework(m.stepList, m.cursor, m.cfg)
 			}
 		} else {
@@ -68,20 +69,17 @@ func (m Model) View() string {
 	return m.stepList[m.cursor].View()
 }
 
-// Cursor returns the current step index (for testing).
 func (m Model) Cursor() int { return m.cursor }
 
-// Config returns the underlying ProjectConfig (for the executor).
 func (m Model) Config() *config.ProjectConfig { return m.cfg }
 
-// applyStepValue writes the completed step's result into ProjectConfig.
-// It intentionally uses a value receiver: cfg is already a pointer, so mutations
-// through m.cfg reach the underlying struct without needing a pointer receiver here.
 func (m Model) applyStepValue(s steps.Step) {
 	val := s.Value()
 	switch s.Label() {
-	case "mode":
+	case stepLabelMode:
 		m.cfg.Mode = val.(string)
+	case "project name":
+		m.cfg.ProjectName = val.(string)
 	case "preset":
 		name := val.(string)
 		if name != "Custom" {
@@ -109,9 +107,14 @@ func (m Model) applyStepValue(s steps.Step) {
 	}
 }
 
-// rebuildAfterFramework replaces the step list from `from` onward with
-// framework-appropriate steps (variant, typescript, linting, ui library,
-// testing, tooling, confirm). Called after the framework step is completed.
+func insertStepAt(list []steps.Step, idx int, s steps.Step) []steps.Step {
+	out := make([]steps.Step, len(list)+1)
+	copy(out, list[:idx])
+	out[idx] = s
+	copy(out[idx+1:], list[idx:])
+	return out
+}
+
 func rebuildAfterFramework(current []steps.Step, from int, cfg *config.ProjectConfig) []steps.Step {
 	head := make([]steps.Step, from)
 	copy(head, current)
@@ -128,14 +131,12 @@ func rebuildAfterFramework(current []steps.Step, from int, cfg *config.ProjectCo
 	return append(head, tail...)
 }
 
-// ExecuteModel is the Bubbletea model for the execution progress screen.
 type ExecuteModel struct {
 	step  steps.Step
 	tasks []executor.Task
 	index int
 }
 
-// NewExecuteModel creates an ExecuteModel from an ExecuteStep and the executor task list.
 func NewExecuteModel(step steps.Step, exTasks []executor.Task) ExecuteModel {
 	return ExecuteModel{step: step, tasks: exTasks}
 }
@@ -144,23 +145,33 @@ func (e ExecuteModel) Init() tea.Cmd {
 	if len(e.tasks) == 0 {
 		return tea.Quit
 	}
-	return runNextTask(e.tasks, 0)
+	return markRunning(0)
 }
 
 func (e ExecuteModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case steps.TaskProgressMsg:
-		newStep, _ := e.step.Update(msg)
+		newStep, stepCmd := e.step.Update(msg)
 		e.step = newStep
-		if msg.State == steps.TaskDone || msg.State == steps.TaskFailed {
+		switch msg.State {
+		case steps.TaskRunning:
+			// Now actually execute the task in a background goroutine.
+			return e, tea.Batch(stepCmd, executeTask(e.tasks, msg.Index))
+		case steps.TaskDone, steps.TaskFailed:
 			if e.index+1 < len(e.tasks) {
 				e.index++
-				return e, runNextTask(e.tasks, e.index)
+				next := e.index
+				return e, tea.Batch(stepCmd, markRunning(next))
 			}
 		}
 		if e.step.IsDone() {
 			return e, tea.Quit
 		}
+		return e, stepCmd
+	case steps.SpinnerTickMsg:
+		newStep, stepCmd := e.step.Update(msg)
+		e.step = newStep
+		return e, stepCmd
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
 			return e, tea.Quit
@@ -171,7 +182,13 @@ func (e ExecuteModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (e ExecuteModel) View() string { return e.step.View() }
 
-func runNextTask(tasks []executor.Task, idx int) tea.Cmd {
+func markRunning(idx int) tea.Cmd {
+	return func() tea.Msg {
+		return steps.TaskProgressMsg{Index: idx, State: steps.TaskRunning}
+	}
+}
+
+func executeTask(tasks []executor.Task, idx int) tea.Cmd {
 	return func() tea.Msg {
 		err := tasks[idx].Run()
 		state := steps.TaskDone

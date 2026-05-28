@@ -2,6 +2,7 @@ package config
 
 type ProjectConfig struct {
 	Mode           string   // "new" | "existing"
+	ProjectName    string   // only set for new projects
 	Preset         string   // preset name or "custom"
 	PackageManager string   // npm | pnpm | yarn | bun
 	Framework      string   // react | vue | svelte | angular | astro

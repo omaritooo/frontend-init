@@ -44,10 +44,11 @@ func TestModel_RebuildAfterFramework(t *testing.T) {
 	cfg := config.New()
 	m := wizard.New(cfg)
 
-	// Steps 1-4 are selects (mode, preset, package manager, framework).
-	// Each Enter confirms item 0 and advances the cursor.
+	// Mode "new" causes a project name step to be inserted after mode.
+	// Steps: mode → project name → preset → package manager → framework → (rebuild) → variant
+	// 5 enters are needed to reach variant.
 	var tm tea.Model = m
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		var cmd tea.Cmd
 		tm, cmd = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		_ = cmd
@@ -55,8 +56,8 @@ func TestModel_RebuildAfterFramework(t *testing.T) {
 
 	wm := tm.(wizard.Model)
 
-	// After 4 enters the cursor should be at index 4 (the new "variant" step).
-	assert.Equal(t, 4, wm.Cursor())
+	// After 5 enters the cursor should be at index 5 (the new "variant" step).
+	assert.Equal(t, 5, wm.Cursor())
 
 	// The current step should be the variant step injected by rebuildAfterFramework.
 	view := wm.View()
@@ -72,10 +73,11 @@ func TestModel_AppliesMultiSelectValue(t *testing.T) {
 	cfg := config.New()
 	m := wizard.New(cfg)
 
-	// Navigate through steps 1-8 (mode, preset, package manager, framework,
-	// variant, typescript, linting, ui library) – all selects.
+	// Navigate through 9 select steps:
+	// mode → project name → preset → package manager → framework →
+	// variant (after rebuild) → typescript → linting → ui library
 	var tm tea.Model = m
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 9; i++ {
 		var cmd tea.Cmd
 		tm, cmd = tm.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		_ = cmd

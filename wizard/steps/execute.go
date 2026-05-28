@@ -1,6 +1,8 @@
 package steps
 
 import (
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -20,23 +22,36 @@ type TaskStatus struct {
 	Err   error
 }
 
-// TaskProgressMsg is sent by the executor to update a task's state.
+// TaskProgressMsg is sent to update a task's state.
 type TaskProgressMsg struct {
 	Index int
 	State TaskState
 	Err   error
 }
 
+// SpinnerTickMsg advances the spinner animation frame.
+type SpinnerTickMsg struct{}
+
+// SpinnerTick returns a command that fires SpinnerTickMsg after 80ms.
+func SpinnerTick() tea.Cmd {
+	return tea.Tick(80*time.Millisecond, func(time.Time) tea.Msg {
+		return SpinnerTickMsg{}
+	})
+}
+
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
 var (
-	doneIcon    = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render("✓")
-	runningIcon = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Render("⠋")
-	pendingIcon = lipgloss.NewStyle().Faint(true).Render("○")
-	failedIcon  = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("✗")
+	doneStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	runningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	failedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	pendingStyle = lipgloss.NewStyle().Faint(true)
 )
 
 type ExecuteStep struct {
-	tasks []TaskStatus
-	done  bool
+	tasks        []TaskStatus
+	spinnerFrame int
+	done         bool
 }
 
 func NewExecuteStep(tasks []TaskStatus) Step {
@@ -48,7 +63,8 @@ func (s *ExecuteStep) Update(msg tea.Msg) (Step, tea.Cmd) {
 	cp.tasks = make([]TaskStatus, len(s.tasks))
 	copy(cp.tasks, s.tasks)
 
-	if msg, ok := msg.(TaskProgressMsg); ok {
+	switch msg := msg.(type) {
+	case TaskProgressMsg:
 		if msg.Index >= 0 && msg.Index < len(cp.tasks) {
 			cp.tasks[msg.Index].State = msg.State
 			cp.tasks[msg.Index].Err = msg.Err
@@ -61,26 +77,41 @@ func (s *ExecuteStep) Update(msg tea.Msg) (Step, tea.Cmd) {
 			}
 		}
 		cp.done = allDone && len(cp.tasks) > 0
+		// Keep spinner going while any task is still running
+		if !cp.done {
+			return &cp, SpinnerTick()
+		}
+	case SpinnerTickMsg:
+		cp.spinnerFrame++
+		// Continue ticking while any task is running
+		for _, t := range cp.tasks {
+			if t.State == TaskRunning {
+				return &cp, SpinnerTick()
+			}
+		}
 	}
 	return &cp, nil
 }
 
 func (s *ExecuteStep) View() string {
+	frame := spinnerFrames[s.spinnerFrame%len(spinnerFrames)]
 	out := titleStyle.Render("Setting up your project") + "\n\n"
 	for _, t := range s.tasks {
-		icon := pendingIcon
+		var icon string
 		switch t.State {
 		case TaskDone:
-			icon = doneIcon
+			icon = doneStyle.Render("✓")
 		case TaskRunning:
-			icon = runningIcon
+			icon = runningStyle.Render(frame)
 		case TaskFailed:
-			icon = failedIcon
+			icon = failedStyle.Render("✗")
+		default:
+			icon = pendingStyle.Render("○")
 		}
 		out += icon + "  " + t.Label + "\n"
 	}
 	if s.done {
-		out += "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true).Render("✓ All done!")
+		out += "\n" + doneStyle.Bold(true).Render("✓ All done!")
 	}
 	return out
 }

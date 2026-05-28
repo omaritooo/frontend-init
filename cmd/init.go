@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -40,8 +41,14 @@ func runInit(_ *cobra.Command, _ []string) error {
 	finalCfg := wm.Config()
 	wd, _ := os.Getwd()
 
+	projectDir := wd
+	if finalCfg.IsNewProject() && finalCfg.ProjectName != "" {
+		projectDir = filepath.Join(wd, finalCfg.ProjectName)
+	}
+
 	runner := &executor.RealRunner{}
-	ex := executor.New(finalCfg, runner, wd)
+	ex := executor.New(finalCfg, runner, projectDir)
+	ex.SetProjectName(finalCfg.ProjectName)
 	tasks := ex.Tasks()
 	wizardTasks := executor.ToWizardTasks(tasks)
 
