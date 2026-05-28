@@ -128,7 +128,7 @@ func (e *Executor) Tasks() []Task {
 func (e *Executor) selectedTools() []ToolSetup {
 	var tools []ToolSetup
 	add := func(key string) {
-		if s := GetToolSetup(key, e.cfg.Framework); s != nil {
+		if s := GetToolSetup(key, e.cfg); s != nil {
 			tools = append(tools, *s)
 		}
 	}

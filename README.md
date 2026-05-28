@@ -63,10 +63,12 @@ frontend-init init   # explicit subcommand (same thing)
 7. TypeScript      — Yes │ No
 8. Linting         — ESLint+Prettier │ Biome │ Oxlint+Prettier │ None
 9. UI library      — (framework-filtered, see below)
-10. Testing         — (framework-filtered, multi-select)
-11. Tooling         — (framework-filtered, multi-select)
-12. Summary         — Review all choices, press Enter to execute
-13. Execution       — Live progress with animated spinner per task
+10. shadcn theme    — (only shown when shadcn/ui or shadcn-svelte is selected)
+                      zinc │ slate │ gray │ neutral │ stone │ red │ rose │ orange │ green │ blue │ violet │ yellow
+11. Testing         — (framework-filtered, multi-select)
+12. Tooling         — (framework-filtered, multi-select)
+13. Summary         — Review all choices, press Enter to execute
+14. Execution       — Live progress with animated spinner per task
 ```
 
 ---
@@ -146,7 +148,7 @@ Every tool carries its complete setup sequence — not just `npm install`:
 1. Installs `@types/node`
 2. Patches `vite.config.ts` — adds `import path from 'path'` and a `resolve.alias` block mapping `@` → `./src`
 3. Patches `tsconfig.app.json` and `tsconfig.json` — adds `baseUrl` and `paths` for the `@/*` alias
-4. Runs `npx shadcn@latest init --yes` (non-interactive, auto-detects project type)
+4. Runs `npx shadcn@latest init -d` (non-interactive defaults: New York style + CSS variables). If a non-default base color is selected in the wizard, appends `--base-color <theme>` (e.g. `slate`, `blue`, `rose`)
 
 ### ESLint + Prettier
 1. Installs `eslint`, `prettier`, `eslint-config-prettier`, `@eslint/js`
@@ -213,6 +215,7 @@ $ frontend-init
 ? TypeScript         yes
 ? Linting            ESLint+Prettier
 ? UI library         shadcn/ui
+? shadcn theme       zinc
 ? Testing            Vitest, Testing Library
 ? Tooling            TanStack Query, Zustand
 
@@ -237,7 +240,7 @@ Press Enter to execute...
 ⠹  Configure Tailwind CSS
    Patch files for shadcn/ui
    Update package.json scripts
-   shadcn/ui: npx shadcn@latest init --yes
+   shadcn/ui: npx shadcn@latest init -d
    vitest: npx vitest init
 ```
 

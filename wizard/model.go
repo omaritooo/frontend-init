@@ -57,6 +57,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case stepLabelFramework:
 				m.stepList = rebuildAfterFramework(m.stepList, m.cursor, m.cfg)
+			case "ui library":
+				if m.cfg.UILibrary == "shadcn" || m.cfg.UILibrary == "shadcn-svelte" {
+					m.stepList = insertStepAt(m.stepList, m.cursor, steps.NewSelectStep("shadcn theme", shadcnThemes()))
+				}
 			}
 		} else {
 			return m, tea.Quit
@@ -100,6 +104,8 @@ func (m Model) applyStepValue(s steps.Step) {
 		m.cfg.Linting = val.(string)
 	case "ui library":
 		m.cfg.UILibrary = val.(string)
+	case "shadcn theme":
+		m.cfg.ShadcnTheme = val.(string)
 	case "testing":
 		m.cfg.Testing = val.([]string)
 	case "tooling":

@@ -103,6 +103,10 @@ func ToolingOptions(cfg *config.ProjectConfig) []string {
 	return nil
 }
 
+func shadcnThemes() []string {
+	return []string{"zinc", "slate", "gray", "neutral", "stone", "red", "rose", "orange", "green", "blue", "violet", "yellow"}
+}
+
 func presetChoices() []string {
 	presets := config.AllPresets()
 	names := make([]string, len(presets))

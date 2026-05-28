@@ -10,6 +10,7 @@ type ProjectConfig struct {
 	TypeScript     bool
 	Linting        string   // eslint-prettier | biome | oxlint | none
 	UILibrary      string
+	ShadcnTheme    string   // base color for shadcn init: zinc | slate | gray | neutral | stone | red | rose | orange | green | blue | violet | yellow
 	Testing        []string
 	Tooling        []string
 }

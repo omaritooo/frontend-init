@@ -3,6 +3,8 @@ package executor
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/omaritooo/frontend-init/config"
 )
 
 type PatchMode int
@@ -35,10 +37,10 @@ type ToolSetup struct {
 	Scripts         map[string]string
 }
 
-// GetToolSetup returns the ToolSetup for the given tool key scoped to a framework.
+// GetToolSetup returns the ToolSetup for the given tool key scoped to a project config.
 // Returns nil if the tool is not in the catalog.
-func GetToolSetup(tool, framework string) *ToolSetup {
-	catalog := buildCatalog(framework)
+func GetToolSetup(tool string, cfg *config.ProjectConfig) *ToolSetup {
+	catalog := buildCatalog(cfg)
 	if s, ok := catalog[tool]; ok {
 		return &s
 	}
@@ -56,7 +58,15 @@ func viteFrameworkPlugin(framework string) string {
 	}
 }
 
-func buildCatalog(framework string) map[string]ToolSetup {
+func shadcnInitCmd(theme string) string {
+	if theme != "" && theme != "zinc" {
+		return "npx shadcn@latest init -d --base-color " + theme
+	}
+	return "npx shadcn@latest init -d"
+}
+
+func buildCatalog(cfg *config.ProjectConfig) map[string]ToolSetup {
+	framework := cfg.Framework
 	mainEntry := mainEntryFile(framework)
 	cssEntry := cssEntryFile(framework)
 	vitePlugin := viteFrameworkPlugin(framework)
@@ -118,7 +128,7 @@ func buildCatalog(framework string) map[string]ToolSetup {
 				},
 			},
 			// shadcn@latest init handles tailwind setup, path aliases, and components.json
-			PostInstallCmds: []string{"npx shadcn@latest init --yes"},
+			PostInstallCmds: []string{shadcnInitCmd(cfg.ShadcnTheme)},
 		},
 		"eslint-prettier": {
 			Name:        "ESLint + Prettier",
